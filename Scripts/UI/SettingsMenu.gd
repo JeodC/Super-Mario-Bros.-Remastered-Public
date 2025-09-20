@@ -16,23 +16,40 @@ var active = false
 
 signal opened
 
+func _ready() -> void:
+	var controller := $PanelContainer/MarginContainer/VBoxContainer/Controller
+	controller.visible = false
+	controller.active = false
+	controller.can_input = false
+	disabled_containers.append(controller)
+	if containers.has(controller):
+		containers.erase(controller)
+
 func _process(_delta: float) -> void:
-	category_select_active = current_container.selected_index == -1 and active
+	if not active:
+		return
+
+	category_select_active = current_container.selected_index == -1
 	%Category.text = tr(current_container.category_name)
 	%Icon.region_rect.position.x = category_index * 24
-	
-	for i in [%LeftArrow, %RightArrow]:
-		i.modulate.a = int(current_container.selected_index == -1)
-	
-	for i in containers.size():
-		containers[i].active = category_index == i and active
-		if SelectableInputOption.rebinding_input == false:
-			containers[i].can_input = can_move
-	for i in disabled_containers:
-		i.active = false
-	if category_select_active and active and can_move:
+
+	for arrow in [%LeftArrow, %RightArrow]:
+		arrow.modulate.a = int(current_container.selected_index == -1)
+
+	for i in range(containers.size()):
+		var c := containers[i]
+		if disabled_containers.has(c):
+			c.active = false
+			c.can_input = false
+			continue
+		c.active = category_index == i
+		if not SelectableInputOption.rebinding_input:
+			c.can_input = can_move
+
+	if category_select_active and can_move:
 		handle_inputs()
-	if Input.is_action_just_pressed("ui_back") and active and current_container.can_input and can_move:
+
+	if Input.is_action_just_pressed("ui_back") and current_container.can_input and can_move:
 		close()
 
 func handle_inputs() -> void:
