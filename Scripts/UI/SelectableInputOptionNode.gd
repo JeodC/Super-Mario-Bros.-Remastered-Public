@@ -82,12 +82,18 @@ func _input(event: InputEvent) -> void:
 		map_event_to_action(event)
 
 func map_event_to_action(event) -> void:
+	if not event is InputEventKey:
+		return
+
 	var action = action_name + "_" + str(player_idx)
-	var events = InputMap.action_get_events(action).duplicate()
-	events[type] = event
-	InputMap.action_erase_events(action)
-	for i in events:
-		InputMap.action_add_event(action, i)
+
+	var old_events = InputMap.action_get_events(action)
+	for e in old_events:
+		if e is InputEventKey:
+			InputMap.action_erase_event(action, e)
+
+	InputMap.action_add_event(action, event)
+
 	input_changed.emit(action, event)
 	input_event = event
 	awaiting_input = false
