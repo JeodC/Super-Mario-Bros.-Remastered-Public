@@ -93,7 +93,15 @@ func map_event_to_action(event) -> void:
 		if action.contains("ui_") == false and action != "pause":
 			action = action_name + "_" + str(player_idx)
 		var events = InputMap.action_get_events(action).duplicate()
-		events[type] = event
+		var replaced = false
+		for i in range(events.size()):
+			if events[i].get_class() == event.get_class():
+				events[i] = event
+				replaced = true
+				break
+		if not replaced:
+			events.append(event)
+		
 		InputMap.action_erase_events(action)
 		for i in events:
 			InputMap.action_add_event(action, i)

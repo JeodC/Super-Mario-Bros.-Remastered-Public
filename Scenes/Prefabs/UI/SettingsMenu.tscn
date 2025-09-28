@@ -46,6 +46,8 @@ var actions := [\"jump\", \"run\", \"action\", \"move_left\", \"move_right\", \"
 func _ready() -> void:
 	get_input_nodes()
 	load_inputs()
+	if ProjectSettings.get_setting(\"application/disable_gamepad\", false):
+		disable_gamepad()
 
 func get_input_nodes() -> void:
 	input_nodes.clear()
@@ -68,6 +70,8 @@ func load_inputs() -> void:
 			var event: InputEvent = null
 			if value == null:
 				continue
+			if type == 1 and ProjectSettings.get_setting(\"application/disable_gamepad\", false):
+				continue
 			if type == 0:
 				event = InputEventKey.new()
 				event.keycode = OS.find_keycode_from_string(value)
@@ -87,11 +91,18 @@ func update_starting_values() -> void:
  
 func save_inputs() -> void:
 	for i in actions:
-		var event = null
-		if i.contains(\"ui\") or i == \"pause\":
-			event = InputMap.action_get_events(i)[type]
-		else:
-			event = InputMap.action_get_events(i + \"_0\")[type]
+		var events = InputMap.action_get_events(i)
+		var event: InputEvent = null
+		for e in events:
+			if type == 0 and e is InputEventKey:
+				event = e
+				break
+			elif type == 1 and (e is InputEventJoypadButton or e is InputEventJoypadMotion):
+				event = e
+				break
+		if event == null:
+			continue
+
 		var rep
 		if event is InputEventKey:
 			rep = OS.get_keycode_string(event.keycode)
@@ -100,8 +111,25 @@ func save_inputs() -> void:
 		elif event is InputEventJoypadMotion:
 			rep = str(event.axis) + \",\" + str(event.axis_value)
 		else:
-			pass
+			continue
+
 		Settings.file[[\"keyboard\", \"controller\"][type]][i] = rep
+
+func disable_gamepad() -> void:
+		var actions = InputMap.get_actions()
+		for action in actions:
+			if InputMap.has_action(action):
+				var events = InputMap.action_get_events(action)
+				if events.is_empty():
+					continue
+				var events_to_remove = []
+				for event in events:
+					if event is InputEventJoypadButton:
+						events_to_remove.append(event)
+					elif event is InputEventJoypadMotion:
+						events_to_remove.append(event)
+				for event in events_to_remove:
+					InputMap.action_erase_event(action, event)
 "
 
 [sub_resource type="StyleBoxLine" id="StyleBoxLine_k6yev"]

@@ -16,7 +16,15 @@ var active = false
 
 signal opened
 
+func _ready() -> void:
+	if ProjectSettings.get_setting("application/disable_gamepad", false):
+		disabled_containers.append($PanelContainer/MarginContainer/VBoxContainer/Controller)
+
 func _process(_delta: float) -> void:
+	while disabled_containers.has(current_container):
+		category_index = wrap(category_index + 1, 0, containers.size())
+		current_container = containers[category_index]
+	
 	category_select_active = current_container.selected_index == -1 and active
 	%Category.text = tr(current_container.category_name)
 	%Icon.region_rect.position.x = category_index * 24
@@ -38,19 +46,21 @@ func _process(_delta: float) -> void:
 func handle_inputs() -> void:
 	var direction := 0
 	if Input.is_action_just_pressed("ui_left"):
-		category_index -= 1
 		direction = -1
 		if Settings.file.audio.extra_sfx == 1:
 			AudioManager.play_global_sfx("menu_move")
-	if Input.is_action_just_pressed("ui_right"):
-		category_index += 1
-		direction += 1
+	elif Input.is_action_just_pressed("ui_right"):
+		direction = 1
 		if Settings.file.audio.extra_sfx == 1:
 			AudioManager.play_global_sfx("menu_move")
-	category_index = wrap(category_index, 0, containers.size())
-	current_container = containers[category_index]
-	if disabled_containers.has(current_container):
+	
+	if direction != 0:
 		category_index = wrap(category_index + direction, 0, containers.size())
+		current_container = containers[category_index]
+
+		while disabled_containers.has(current_container):
+			category_index = wrap(category_index + direction, 0, containers.size())
+			current_container = containers[category_index]
 
 func open_pack_config_menu(pack: ResourcePackContainer) -> void:
 	$ResourcePackConfigMenu.config_json = pack.config

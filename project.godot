@@ -25,6 +25,7 @@ boot_splash/fullsize=false
 boot_splash/use_filter=false
 config/icon="res://icon.png"
 use_discord=true
+disable_gamepad=false
 
 [autoload]
 
