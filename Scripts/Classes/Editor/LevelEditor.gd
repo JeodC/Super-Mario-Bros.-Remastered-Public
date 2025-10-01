@@ -124,6 +124,7 @@ func _ready() -> void:
 	for i in entity_layer_nodes:
 		for x in i.get_children():
 			entity_tiles[layer_idx][x.get_meta("tile_position")] = x
+		layer_idx += 1
 	if level_file != {}:
 		Level.can_set_time = true
 		$LevelLoader.load_level(Checkpoint.sublevel_id)
@@ -131,6 +132,20 @@ func _ready() -> void:
 			$Info.hide()
 			%Grid.hide()
 			play_level()
+			# Gradually parse tiles to avoid spike
+			var idx_layer := 0
+			for layer in entity_layer_nodes:
+				if not is_instance_valid(layer):
+					idx_layer += 1
+					continue
+				saved_entity_layers[idx_layer] = layer.duplicate(DUPLICATE_USE_INSTANTIATION)
+				for entity in layer.get_children():
+					entity_tiles[idx_layer][entity.get_meta("tile_position")] = entity
+					entity.ready.emit()
+					entity.set_process_mode(Node.PROCESS_MODE_INHERIT)
+					# Yield every entity
+					await get_tree().process_frame
+				idx_layer += 1
 			_physics_process(0)
 			set_physics_process(false)
 			for i in [$TileMenu]:
@@ -147,30 +162,16 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if current_state == EditorState.PLAYTESTING:
+		return
 	if current_state == EditorState.IDLE:
 		handle_tile_cursor()
 	if [EditorState.IDLE, EditorState.TRACK_EDITING].has(current_state):
 		handle_camera(delta)
 	if is_instance_valid(%ThemeName):
 		%ThemeName.text = Global.level_theme
-	handle_hud()
-	if Input.is_action_just_pressed("editor_open_menu"):
-		if current_state == EditorState.IDLE:
-			open_tile_menu()
-		elif current_state == EditorState.TILE_MENU:
-			close_tile_menu()
-	if Input.is_action_just_pressed("editor_play") and (current_state == EditorState.IDLE or current_state == EditorState.PLAYTESTING) and Global.current_game_mode == Global.GameMode.LEVEL_EDITOR:
-		Checkpoint.passed_checkpoints.clear()
-		if current_state == EditorState.PLAYTESTING:
-			stop_testing()
-		else:
-			play_level()
+	handle_editor_input()
 	handle_layers()
-
-func handle_hud() -> void:
-	$TileCursor.visible = current_state == EditorState.IDLE
-	$Info.visible = not playing_level
-	%Grid.visible = not playing_level
 
 func quit_editor() -> void:
 	%QuitDialog.show()
@@ -274,7 +275,10 @@ func play_level() -> void:
 	if Global.current_game_mode != Global.GameMode.CUSTOM_LEVEL:
 		level_file = await $LevelSaver.save_level(level_name, level_author, level_desc, difficulty)
 	current_state = EditorState.PLAYTESTING
-	handle_hud()
+	$TileCursor.visible = false
+	$Info.visible = false
+	%Grid.visible = false
+	set_physics_process(false)
 
 func parse_tiles() -> void:
 	saved_entity_layers = [null, null, null, null, null]
@@ -303,7 +307,10 @@ func return_to_editor() -> void:
 	Door.unlocked_doors.clear()
 	editor_start.emit()
 	current_state = EditorState.IDLE
-	handle_hud()
+	$TileCursor.visible = true
+	$Info.visible = true
+	%Grid.visible = true
+	set_physics_process(true)
 
 func return_editor_tiles() -> void:
 	for i in entity_layer_nodes:
@@ -329,7 +336,22 @@ func handle_camera(delta: float) -> void:
 	%Camera.global_position.y = clamp(%Camera.global_position.y, $Level.vertical_height + (get_viewport().get_visible_rect().size.y / 2), 32 - (get_viewport().get_visible_rect().size.y / 2))
 	%Camera.global_position.x = clamp(%Camera.global_position.x, -256 + (get_viewport().get_visible_rect().size.x / 2), INF)
 
+func handle_editor_input() -> void:
+	if Input.is_action_just_pressed("editor_open_menu"):
+		if current_state == EditorState.IDLE:
+			open_tile_menu()
+		elif current_state == EditorState.TILE_MENU:
+			close_tile_menu()
+	if Input.is_action_just_pressed("editor_play") and (current_state == EditorState.IDLE or current_state == EditorState.PLAYTESTING) and Global.current_game_mode == Global.GameMode.LEVEL_EDITOR:
+		Checkpoint.passed_checkpoints.clear()
+		if current_state == EditorState.PLAYTESTING:
+			stop_testing()
+		else:
+			play_level()
+
 func handle_layers() -> void:
+	if current_state == EditorState.PLAYTESTING:
+		return
 	if Input.is_action_just_pressed("layer_up"):
 		current_layer += 1
 	if Input.is_action_just_pressed("layer_down"):
